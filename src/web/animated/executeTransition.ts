@@ -11,6 +11,7 @@
 import _ = require('./../utils/lodashMini');
 
 export interface ITransitionSpec {
+    identifier?: string;
     property: string;
     duration: number;
     timing?: string;

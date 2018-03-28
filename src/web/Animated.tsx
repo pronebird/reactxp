@@ -368,6 +368,8 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
         private _staticTransforms!: { [transform: string]: string };
         private _animatedTransforms: AnimatedValueMap;
 
+        private _animationUniqueId = 0;
+
         constructor(props: PropsType) {
             super(props);
 
@@ -425,6 +427,7 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
                     }
                 }
                 this._animatedAttributes[attrib].activeTransition = {
+                    identifier: this._animationUniqueId.toString(),
                     property: Styles.convertJsToCssStyle(attrib),
                     from: this._generateCssAttributeValue(attrib, this._animatedAttributes[attrib].valueObject, fromValue),
                     to: this._generateCssAttributeValue(attrib, this._animatedAttributes[attrib].valueObject, toValue),
@@ -434,6 +437,7 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
                     toValue,
                     onEnd
                 };
+                this._animationUniqueId++;
                 updateTransition = true;
             }
 
@@ -445,6 +449,7 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
                     }
                 }
                 this._animatedTransforms[transform].activeTransition = {
+                    identifier: this._animationUniqueId.toString(),
                     property: transform,
                     from: fromValue,
                     to: toValue,
@@ -454,6 +459,7 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
                     toValue,
                     onEnd
                 };
+                this._animationUniqueId++;
                 updateTransition = true;
             }
 
@@ -561,6 +567,7 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
             if (index >= 0) {
                 let transformTransition = this._animatedTransforms[keys[index]].activeTransition!;
                 activeTransitions.push({
+                    identifier: transformTransition.identifier,
                     property: 'transform',
                     from: this._generateCssTransformList(false),
                     to: this._generateCssTransformList(true),
@@ -575,17 +582,28 @@ function createAnimatedComponent<PropsType extends Types.CommonProps>(Component:
                     // Clear all of the active transitions and invoke the onEnd callbacks.
                     let completeTransitions: ExtendedTransition[] = [];
 
+                    // Since stopping Timing function does not cancel the watchdog timer
+                    // use unique identifiers to make sure that only transitions
+                    // belonging to this transaction are being cleared.
+                    let affectedTransitionIdentifiers = _.map(activeTransitions, function (transition) {
+                        return transition.identifier;
+                    });
+
                     _.each(this._animatedAttributes, attrib => {
                         if (attrib.activeTransition) {
-                            completeTransitions.push(attrib.activeTransition);
-                            delete attrib.activeTransition;
+                            if (affectedTransitionIdentifiers.indexOf(attrib.activeTransition.identifier) !== -1) {
+                                completeTransitions.push(attrib.activeTransition);
+                                delete attrib.activeTransition;
+                            }
                         }
                     });
 
                     _.each(this._animatedTransforms, transform => {
                         if (transform.activeTransition) {
-                            completeTransitions.push(transform.activeTransition);
-                            delete transform.activeTransition;
+                            if (affectedTransitionIdentifiers.indexOf(transform.activeTransition.identifier) !== -1) {
+                                completeTransitions.push(transform.activeTransition);
+                                delete transform.activeTransition;
+                            }
                         }
                     });
 
